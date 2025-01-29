@@ -11,13 +11,16 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     start(controller) {
-      const encuestaRef = db.collection("opciones").where("preguntaId", "==", encuestaId);
+      // Recoger las opciones de una pregunta en tiempo real
+      const encuestaRef = db.collection("Opcion").where("preguntaId", "==", encuestaId);
 
+      // Escuchar cambios en la base de datos y crear un JSON con los datos
       const unsubscribe = encuestaRef.onSnapshot((snapshot) => {
         const data = snapshot.docs.map((doc) => doc.data());
         controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
       });
 
+      // Cerrar el stream si la conexión se cierra
       req.signal.addEventListener("abort", () => {
         unsubscribe();
         controller.close();
