@@ -23,9 +23,17 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+// Path: app/api/opciones/route.ts - Metodo para obtener las opciones de una pregunta en base a su ID
+export async function GET(req: NextRequest) {
   try {
-    const snapshot = await db.collection("Opcion").get();
+    const { searchParams } = new URL(req.url);
+    const preguntaId = searchParams.get("preguntaId");
+
+    if (!preguntaId) {
+      return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+    }
+
+    const snapshot = await db.collection("Opcion").where("preguntaId", "==", preguntaId).get();
     const opciones = snapshot.docs.map((doc) => doc.data());
 
     return NextResponse.json(opciones);
