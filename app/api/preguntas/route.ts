@@ -18,7 +18,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id: preguntaRef.id, encuestaId, titulo });
   } catch (error) {
-    return NextResponse.json({ error: "Error al crear la pregunta" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al crear la pregunta" },
+      { status: 500 }
+    );
   }
 }
 
@@ -29,14 +32,23 @@ export async function GET(req: NextRequest) {
     const encuestaId = searchParams.get("encuestaId");
 
     if (!encuestaId) {
-      return NextResponse.json({ error: "Falta el parámetro encuestaId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Falta el parámetro encuestaId" },
+        { status: 400 }
+      );
     }
 
-    const snapshot = await db.collection("Pregunta").where("encuestaId", "==", encuestaId).get();
+    const snapshot = await db
+      .collection("Pregunta")
+      .where("encuestaId", "==", encuestaId)
+      .get();
     const preguntas = snapshot.docs.map((doc) => doc.data());
 
     return NextResponse.json(preguntas);
   } catch (error) {
-    return NextResponse.json({ error: "Error al obtener preguntas" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error al obtener preguntas" },
+      { status: 500 }
+    );
   }
 }
