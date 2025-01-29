@@ -4,9 +4,10 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("POST /api/auth/register");
     const { nombre, apellido, email, password } = await req.json();
     
-    const usuariosRef = db.collection("usuarios");
+    const usuariosRef = db.collection("Usuario");
     const userExists = await usuariosRef.where("email", "==", email).get();
 
     if (!userExists.empty) {
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id: userDoc.id, nombre, apellido, email });
   } catch (error) {
-    return NextResponse.json({ error: "Error en el registro" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error en el registro" + (error as Error).message },
+      { status: 500 },
+    );
   }
 }

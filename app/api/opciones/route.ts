@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    const opcionRef = db.collection("opciones").doc();
+    const opcionRef = db.collection("Opcion").doc();
     await opcionRef.set({
       id: opcionRef.id,
       preguntaId,
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const snapshot = await db.collection("opciones").get();
+    const snapshot = await db.collection("Opcion").get();
     const opciones = snapshot.docs.map((doc) => doc.data());
 
     return NextResponse.json(opciones);

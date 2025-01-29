@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
     }
 
-    const participanteRef = db.collection("participantes").doc();
+    const participanteRef = db.collection("Participante").doc();
     await participanteRef.set({
       id: participanteRef.id,
       nombre,
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Actualizar el contador de participantes en la encuesta
-    const encuestaRef = db.collection("encuestas").doc(encuestaId);
+    const encuestaRef = db.collection("Encuesta").doc(encuestaId);
     const encuestaDoc = await encuestaRef.get();
 
     if (encuestaDoc.exists) {
