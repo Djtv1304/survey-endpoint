@@ -11,7 +11,6 @@ export async function GET(req: NextRequest) {
     return new Response("Encuesta ID es requerido", { status: 400 });
   }
 
-  const preguntasEmitidas: Set<string> = new Set(); // Para asegurarnos de que no enviamos las preguntas duplicadas
   const stream = new ReadableStream({
     start(controller) {
       console.log("Conexión SSE iniciada para encuestaId:", encuestaId);
@@ -27,62 +26,51 @@ export async function GET(req: NextRequest) {
         const preguntasConOpciones = await Promise.all(preguntas.map(async (pregunta) => {
           const preguntaId = pregunta.id;
 
-          // Solo enviamos la pregunta si no ha sido enviada antes
-          if (!preguntasEmitidas.has(preguntaId)) {
-            preguntasEmitidas.add(preguntaId); // Marcamos la pregunta como emitida
+          // Ahora buscamos las opciones de esta pregunta
+          const opcionesRef = db.collection("Opcion").where("preguntaId", "==", preguntaId);
+          const opcionesSnapshot = await opcionesRef.get();
+          const opciones = opcionesSnapshot.docs.map((doc) => doc.data());
 
-            // Ahora buscamos las opciones de esta pregunta
-            const opcionesRef = db.collection("Opcion").where("preguntaId", "==", preguntaId);
-            const opcionesSnapshot = await opcionesRef.get();
-            const opciones = opcionesSnapshot.docs.map((doc) => doc.data());
-
-            // Agregamos las opciones a la pregunta
-            return { ...pregunta, opciones };
-          }
-
-          return null; // Si ya se ha enviado la pregunta, no la volvemos a enviar
+          // Agregamos las opciones a la pregunta
+          return { ...pregunta, opciones };
         }));
 
-        // Filtramos cualquier valor `null` (si alguna pregunta ya había sido emitida)
-        const preguntasFinales = preguntasConOpciones.filter((pregunta) => pregunta !== null);
-
         // Enviar las preguntas y opciones actualizadas al cliente
-        if (preguntasFinales.length > 0) {
-          controller.enqueue(`data: ${JSON.stringify(preguntasFinales)}\n\n`);
-        }
-      });
+        controller.enqueue(`data: ${JSON.stringify(preguntasConOpciones)}\n\n`);
 
-      // Escuchar cambios en la colección "Opcion" (donde están los votos) y emitir datos actualizados
-      const opcionRef = db.collection("Opcion").where("encuestaId", "==", encuestaId);
-      const unsubscribeOpciones = opcionRef.onSnapshot(async (snapshot) => {
-        // Cuando hay cambios en los votos, obtenemos nuevamente las preguntas y sus opciones
-        const preguntasConOpcionesActualizadas = await Promise.all(
-          snapshot.docs.map(async (doc) => {
-            const opcion = doc.data();
-            const preguntaRef = db.collection("Pregunta").doc(opcion.preguntaId);
-            const preguntaDoc = await preguntaRef.get();
-            const pregunta = preguntaDoc.data();
+        // Ahora que tenemos las preguntas y sus opciones, podemos escuchar cambios en las opciones (votos)
+        // Escuchar la colección "Opcion" para detectar cambios en los votos
+        const opcionRef = db.collection("Opcion").where("preguntaId", "in", preguntas.map(p => p.id));
+        const unsubscribeOpciones = opcionRef.onSnapshot(async (snapshot) => {
+          // Cuando hay cambios en los votos, obtenemos nuevamente las preguntas y sus opciones
+          const preguntasConOpcionesActualizadas = await Promise.all(
+            snapshot.docs.map(async (doc) => {
+              const opcion = doc.data();
+              const preguntaRef = db.collection("Pregunta").doc(opcion.preguntaId);
+              const preguntaDoc = await preguntaRef.get();
+              const pregunta = preguntaDoc.data();
 
-            // Obtener opciones relacionadas con la pregunta
-            const opcionesRef = db.collection("Opcion").where("preguntaId", "==", opcion.preguntaId);
-            const opcionesSnapshot = await opcionesRef.get();
-            const opciones = opcionesSnapshot.docs.map((opcionDoc) => opcionDoc.data());
+              // Obtener opciones relacionadas con la pregunta
+              const opcionesRef = db.collection("Opcion").where("preguntaId", "==", opcion.preguntaId);
+              const opcionesSnapshot = await opcionesRef.get();
+              const opciones = opcionesSnapshot.docs.map((opcionDoc) => opcionDoc.data());
 
-            // Agregar opciones a la pregunta
-            return { ...pregunta, opciones };
-          })
-        );
+              // Agregar opciones a la pregunta
+              return { ...pregunta, opciones };
+            })
+          );
 
-        // Emitir las preguntas actualizadas con sus opciones y los votos recientes
-        controller.enqueue(`data: ${JSON.stringify(preguntasConOpcionesActualizadas)}\n\n`);
-      });
+          // Emitir las preguntas actualizadas con sus opciones y los votos recientes
+          controller.enqueue(`data: ${JSON.stringify(preguntasConOpcionesActualizadas)}\n\n`);
+        });
 
-      // Cerrar el stream si la conexión se cierra
-      req.signal.addEventListener("abort", () => {
-        console.log("SSE connection closed");
-        unsubscribe();
-        unsubscribeOpciones();
-        controller.close();
+        // Cerrar el stream si la conexión se cierra
+        req.signal.addEventListener("abort", () => {
+          console.log("SSE connection closed");
+          unsubscribe();
+          unsubscribeOpciones();
+          controller.close();
+        });
       });
     },
   });
